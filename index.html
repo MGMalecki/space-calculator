@@ -54,6 +54,12 @@
       background: #f0a500;
       color: white;
     }
+
+    /* The message that says "Correct!" or "Oops!" */
+    #feedback {
+      font-size: 28px;
+      min-height: 40px;      /* keeps space for it, so nothing jumps around */
+    }
   </style>
 </head>
 
@@ -73,7 +79,78 @@
   <!-- inputmode="numeric" makes phones show the number keypad -->
   <input id="answer" type="text" inputmode="numeric">
 
-  <button>Check</button>
+  <button id="check">Check</button>
+
+  <!-- Empty for now. JavaScript writes "Correct!" or "Oops!" here. -->
+  <div id="feedback"></div>
+
+  <!-- The SCRIPT is the brain of the game: JavaScript that makes things happen -->
+  <script>
+    // Find the parts of the page we want to control, using their ids
+    const questionBox = document.getElementById("question");
+    const answerBox = document.getElementById("answer");
+    const checkButton = document.getElementById("check");
+    const feedbackBox = document.getElementById("feedback");
+
+    // Level 1 uses these times tables
+    const tables = [1, 2, 3, 4, 5, 10];
+
+    // Here we remember the right answer to the current question
+    let correctAnswer = 0;
+
+    // Gives a random whole number from 1 to max
+    function randomNumber(max) {
+      return Math.floor(Math.random() * max) + 1;
+    }
+
+    // Makes a new random question and shows it
+    function newQuestion() {
+      // Pick one table from the list, e.g. 4
+      const a = tables[randomNumber(tables.length) - 1];
+      // Pick a number from 1 to 10, e.g. 7
+      const b = randomNumber(10);
+
+      correctAnswer = a * b;
+      questionBox.textContent = a + " × " + b + " = ?";
+
+      answerBox.value = "";   // clear the old answer
+      answerBox.focus();      // put the cursor in the box, ready to type
+    }
+
+    // Runs when the child presses Check
+    function checkAnswer() {
+      // Do nothing if the box is empty
+      if (answerBox.value === "") {
+        return;
+      }
+
+      // The box holds text, so turn it into a number before comparing
+      const childAnswer = Number(answerBox.value);
+
+      if (childAnswer === correctAnswer) {
+        feedbackBox.textContent = "Correct! 🎉";
+        feedbackBox.style.color = "green";
+      } else {
+        feedbackBox.textContent = "Oops! It was " + correctAnswer;
+        feedbackBox.style.color = "red";
+      }
+
+      newQuestion();
+    }
+
+    // When the button is clicked, check the answer
+    checkButton.addEventListener("click", checkAnswer);
+
+    // Pressing Enter on the keyboard also checks the answer
+    answerBox.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") {
+        checkAnswer();
+      }
+    });
+
+    // Show the very first question when the page opens
+    newQuestion();
+  </script>
 
 </body>
 </html>
