@@ -29,28 +29,30 @@
 
     /* The row of stars (right answers in a row) or crosses (wrong answers in a row) */
     #streak {
-      font-size: 36px;
-      min-height: 50px;      /* keeps space even when the row is empty */
-      margin-top: 15px;
+      font-size: 32px;
+      min-height: 44px;      /* keeps space even when the row is empty */
+      margin-top: 8px;
     }
 
     /* The big sum in the middle */
     #question {
-      font-size: 56px;
+      font-size: 52px;
       font-weight: bold;
-      margin: 60px 0 30px;
+      margin: 10px 0;
     }
 
-    /* The box where the child types the answer */
+    /* The box that shows the answer. The child fills it with the number pad. */
     #answer {
       font-size: 40px;
       width: 160px;
       text-align: center;
       border: 3px solid #f0a500;
       border-radius: 12px;   /* rounded corners */
+      background: white;
+      color: #333;
     }
 
-    /* The orange buttons (Check and Play again) */
+    /* The orange buttons (Start and Play again) */
     button {
       display: block;
       margin: 30px auto;     /* "auto" puts it in the middle */
@@ -60,13 +62,39 @@
       border-radius: 12px;
       background: #f0a500;
       color: white;
+      touch-action: manipulation;   /* stops the phone zooming in on quick double taps */
     }
 
     /* The message that says "Correct!" or "Oops!" */
     #feedback {
-      font-size: 28px;
-      min-height: 40px;      /* keeps space for it, so nothing jumps around */
+      font-size: 24px;
+      min-height: 34px;      /* keeps space for it, so nothing jumps around */
+      margin-top: 6px;
     }
+
+    /* The number pad: a grid with 3 buttons in each row */
+    #pad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);   /* 3 columns, all the same width */
+      gap: 10px;
+      max-width: 300px;
+      margin: 6px auto 0;
+    }
+
+    /* One button on the number pad */
+    .key {
+      margin: 0;
+      padding: 10px 0;
+      font-size: 30px;
+      background: white;
+      color: #333;
+      border: 2px solid #f0a500;
+    }
+    .key:active { background: #ffe9b3; }   /* lights up while pressed */
+
+    /* The delete key and the check key get their own colours */
+    .key.delete { background: #eee; border-color: #ccc; }
+    .key.check  { background: #2a2;  border-color: #2a2; color: white; }
 
     /* ---------- The end screen (game over or win) ---------- */
 
@@ -221,13 +249,28 @@
   <!-- The question. The id lets JavaScript change it later. -->
   <div id="question">6 × 7 = ?</div>
 
-  <!-- inputmode="numeric" makes phones show the number keypad -->
-  <input id="answer" type="text" inputmode="numeric">
-
-  <button id="check">Check</button>
+  <!-- The answer box. "readonly" means the phone keyboard never pops up:
+       the child uses the game's own number pad below instead. -->
+  <input id="answer" type="text" readonly>
 
   <!-- Empty for now. JavaScript writes "Correct!" or "Oops!" here. -->
   <div id="feedback"></div>
+
+  <!-- The game's own number pad. "onclick" says which function runs when a button is tapped. -->
+  <div id="pad">
+    <button class="key" onclick="pressDigit('1')">1</button>
+    <button class="key" onclick="pressDigit('2')">2</button>
+    <button class="key" onclick="pressDigit('3')">3</button>
+    <button class="key" onclick="pressDigit('4')">4</button>
+    <button class="key" onclick="pressDigit('5')">5</button>
+    <button class="key" onclick="pressDigit('6')">6</button>
+    <button class="key" onclick="pressDigit('7')">7</button>
+    <button class="key" onclick="pressDigit('8')">8</button>
+    <button class="key" onclick="pressDigit('9')">9</button>
+    <button class="key delete" onclick="deleteDigit()">⌫</button>
+    <button class="key" onclick="pressDigit('0')">0</button>
+    <button class="key check" onclick="checkAnswer()">✓</button>
+  </div>
 
   <!-- The start screen. It shows first, and covers the game until Start is pressed. -->
   <div id="startScreen">
@@ -263,7 +306,6 @@
     // Find the parts of the page we want to control, using their ids
     const questionBox = document.getElementById("question");
     const answerBox = document.getElementById("answer");
-    const checkButton = document.getElementById("check");
     const feedbackBox = document.getElementById("feedback");
     const timerBox = document.getElementById("timer");
     const levelBox = document.getElementById("level");
@@ -378,7 +420,6 @@
       questionBox.textContent = a + " × " + b + " = ?";
 
       answerBox.value = "";   // clear the old answer
-      answerBox.focus();      // put the cursor in the box, ready to type
 
       startTimer();           // every new question gets a fresh countdown
     }
@@ -415,7 +456,6 @@
     function showLevelUp() {
       playing = false;        // no answers while we celebrate
       clearInterval(clock);   // pause the countdown
-      answerBox.blur();       // closes the phone keyboard
       feedbackBox.textContent = "";
 
       levelUpText.textContent = "Level " + level + "! 🚀";
@@ -462,7 +502,6 @@
     function stopGame() {
       playing = false;
       clearInterval(clock);
-      answerBox.blur();   // closes the phone keyboard
       showInfo();
     }
 
@@ -507,7 +546,26 @@
       newQuestion();
     }
 
-    // Runs when the child presses Check
+    // Runs when a number on the pad is tapped: adds that digit to the answer
+    function pressDigit(digit) {
+      // Do nothing between games or during the level-up celebration,
+      // and allow at most 3 digits (the biggest answer is 100)
+      if (!playing || answerBox.value.length >= 3) {
+        return;
+      }
+      answerBox.value = answerBox.value + digit;
+    }
+
+    // Runs when ⌫ is tapped: removes the last digit
+    function deleteDigit() {
+      if (!playing) {
+        return;
+      }
+      // .slice(0, -1) means "everything except the last character"
+      answerBox.value = answerBox.value.slice(0, -1);
+    }
+
+    // Runs when ✓ is tapped
     function checkAnswer() {
       // Do nothing if the game is finished or the box is empty
       if (!playing || answerBox.value === "") {
@@ -524,16 +582,19 @@
       }
     }
 
-    // When the button is clicked, check the answer
-    checkButton.addEventListener("click", checkAnswer);
-
     // "Start" and "Play again" both start a new game
     startButton.addEventListener("click", startGame);
     playAgainButton.addEventListener("click", startGame);
 
-    // Pressing Enter on the keyboard also checks the answer
-    answerBox.addEventListener("keydown", function (event) {
-      if (event.key === "Enter") {
+    // On a computer, the real keyboard works too: digits, Backspace and Enter
+    document.addEventListener("keydown", function (event) {
+      if (event.key >= "0" && event.key <= "9") {
+        pressDigit(event.key);
+      } else if (event.key === "Backspace") {
+        deleteDigit();
+      } else if (event.key === "Enter") {
+        // Stop Enter from also "pressing" whichever button was tapped last
+        event.preventDefault();
         checkAnswer();
       }
     });
