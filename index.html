@@ -20,7 +20,7 @@
       padding: 20px;
     }
 
-    /* The top row: level, stars and time, spread across the screen */
+    /* The top row: level, stars, penalties and time, spread across the screen */
     .info {
       display: flex;
       justify-content: space-between;
@@ -66,10 +66,11 @@
 <!-- The BODY is everything you actually see on the screen -->
 <body>
 
-  <!-- Top row: level, stars, seconds left -->
+  <!-- Top row: level, stars, penalty points, seconds left -->
   <div class="info">
-    <span>Level 1</span>
-    <span>⭐ 0</span>
+    <span id="level">Level 1</span>
+    <span id="stars">⭐ 0</span>
+    <span id="penalties">❌ 0</span>
     <span id="timer">⏱️ 10</span>
   </div>
 
@@ -92,26 +93,41 @@
     const checkButton = document.getElementById("check");
     const feedbackBox = document.getElementById("feedback");
     const timerBox = document.getElementById("timer");
+    const levelBox = document.getElementById("level");
+    const starsBox = document.getElementById("stars");
+    const penaltiesBox = document.getElementById("penalties");
 
-    // Level 1 uses these times tables
-    const tables = [1, 2, 3, 4, 5, 10];
+    // The rules for each level: which tables, and how many seconds per question
+    const levels = {
+      1: { tables: [1, 2, 3, 4, 5, 10],              time: 10 },
+      2: { tables: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],  time: 7 },
+      3: { tables: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],  time: 5 }  // missing-number questions
+    };
 
-    // Level 1 gives 10 seconds for each question
-    const timeLimit = 10;
+    // How many right answers in a row you need for a star
+    const neededInARow = 5;
 
-    // Here we remember the right answer to the current question
-    let correctAnswer = 0;
+    // The game's "memory": these numbers change while you play
+    let level = 1;          // which level we are on
+    let stars = 0;          // stars earned
+    let penalties = 0;      // penalty points (wrong answers and timeouts)
+    let streak = 0;         // right answers in a row
+    let playing = true;     // becomes false when the game is won
+    let correctAnswer = 0;  // the right answer to the current question
+    let timeLeft = 0;       // seconds left for this question
+    let clock;              // the ticking clock, kept so we can stop it
 
-    // Here we remember how many seconds are left
-    let timeLeft = 0;
+    // Updates the top row so it shows the latest numbers
+    function showInfo() {
+      levelBox.textContent = "Level " + level;
+      starsBox.textContent = "⭐ " + stars;
+      penaltiesBox.textContent = "❌ " + penalties;
+    }
 
-    // The ticking clock. We keep it so we can stop it later.
-    let clock;
-
-    // Starts the countdown again from the full time
+    // Starts the countdown again from the full time for this level
     function startTimer() {
       clearInterval(clock);   // stop the old clock first, so we never have two
-      timeLeft = timeLimit;
+      timeLeft = levels[level].time;
       timerBox.textContent = "⏱️ " + timeLeft;
 
       // setInterval runs the tick function again and again, every 1000 ms (1 second)
@@ -125,9 +141,7 @@
 
       // Time is up: this counts as a wrong answer
       if (timeLeft === 0) {
-        feedbackBox.textContent = "Time's up! It was " + correctAnswer;
-        feedbackBox.style.color = "red";
-        newQuestion();
+        wrongAnswer("Time's up! It was " + correctAnswer);
       }
     }
 
@@ -138,13 +152,22 @@
 
     // Makes a new random question and shows it
     function newQuestion() {
+      const tables = levels[level].tables;
+
       // Pick one table from the list, e.g. 4
       const a = tables[randomNumber(tables.length) - 1];
       // Pick a number from 1 to 10, e.g. 7
       const b = randomNumber(10);
 
-      correctAnswer = a * b;
-      questionBox.textContent = a + " × " + b + " = ?";
+      if (level === 3) {
+        // Level 3: hide one number, e.g. "4 × ? = 28". The answer is the hidden number.
+        correctAnswer = b;
+        questionBox.textContent = a + " × ? = " + (a * b);
+      } else {
+        // Levels 1 and 2: a normal sum, e.g. "4 × 7 = ?"
+        correctAnswer = a * b;
+        questionBox.textContent = a + " × " + b + " = ?";
+      }
 
       answerBox.value = "";   // clear the old answer
       answerBox.focus();      // put the cursor in the box, ready to type
@@ -152,10 +175,54 @@
       startTimer();           // every new question gets a fresh countdown
     }
 
+    // What happens after a right answer
+    function rightAnswer() {
+      streak = streak + 1;
+
+      if (streak === neededInARow) {
+        // 5 in a row: earn a star!
+        stars = stars + 1;
+        streak = 0;
+
+        if (level === 3) {
+          // A star on the last level means the game is won
+          playing = false;
+          clearInterval(clock);
+          feedbackBox.textContent = "You won! 🏆";
+          feedbackBox.style.color = "green";
+          showInfo();
+          return;   // stop here: no more questions
+        }
+
+        // Otherwise move up a level
+        level = level + 1;
+        feedbackBox.textContent = "⭐ Star! Level " + level + "!";
+        feedbackBox.style.color = "green";
+      } else {
+        feedbackBox.textContent = "Correct! 🎉 " + streak + " in a row";
+        feedbackBox.style.color = "green";
+      }
+
+      showInfo();
+      newQuestion();
+    }
+
+    // What happens after a wrong answer (or when time runs out)
+    function wrongAnswer(message) {
+      penalties = penalties + 1;
+      streak = 0;   // a wrong answer breaks the streak
+
+      feedbackBox.textContent = message;
+      feedbackBox.style.color = "red";
+
+      showInfo();
+      newQuestion();
+    }
+
     // Runs when the child presses Check
     function checkAnswer() {
-      // Do nothing if the box is empty
-      if (answerBox.value === "") {
+      // Do nothing if the game is finished or the box is empty
+      if (!playing || answerBox.value === "") {
         return;
       }
 
@@ -163,14 +230,10 @@
       const childAnswer = Number(answerBox.value);
 
       if (childAnswer === correctAnswer) {
-        feedbackBox.textContent = "Correct! 🎉";
-        feedbackBox.style.color = "green";
+        rightAnswer();
       } else {
-        feedbackBox.textContent = "Oops! It was " + correctAnswer;
-        feedbackBox.style.color = "red";
+        wrongAnswer("Oops! It was " + correctAnswer);
       }
-
-      newQuestion();
     }
 
     // When the button is clicked, check the answer
@@ -184,6 +247,7 @@
     });
 
     // Show the very first question when the page opens
+    showInfo();
     newQuestion();
   </script>
 
