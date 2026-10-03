@@ -144,6 +144,29 @@
       animation: fall 3s linear infinite;
     }
 
+    /* ---------- The level-up celebration ---------- */
+
+    /* Covers the game for a moment while confetti rains down */
+    #levelUp {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.8);   /* see-through white */
+      justify-content: center;
+      align-items: center;
+    }
+    #levelUp.show { display: flex; }
+
+    /* The big "Level 2! 🚀" */
+    #levelUpText {
+      font-size: 56px;
+      font-weight: bold;
+      color: #f0a500;
+      position: relative;
+      animation: grow 0.6s, bounce 0.8s 0.6s infinite;
+    }
+
     /* ---------- Animations: how things move over time ---------- */
     @keyframes grow   { from { transform: scale(0); } to { transform: scale(1); } }
     @keyframes pop    { from { transform: scale(0) rotate(-5deg); } to { transform: scale(1) rotate(-5deg); } }
@@ -179,6 +202,12 @@
   <!-- Empty for now. JavaScript writes "Correct!" or "Oops!" here. -->
   <div id="feedback"></div>
 
+  <!-- The level-up celebration. Hidden until you reach a new level. -->
+  <div id="levelUp">
+    <div id="levelUpRain"></div>   <!-- JavaScript fills this with confetti -->
+    <div id="levelUpText"></div>
+  </div>
+
   <!-- The end screen. Hidden until the game is won or lost. -->
   <div id="endScreen">
     <div id="lava"></div>
@@ -210,6 +239,12 @@
     const endTitle = document.getElementById("endTitle");
     const confetti = document.getElementById("confetti");
     const playAgainButton = document.getElementById("playAgain");
+    const levelUpScreen = document.getElementById("levelUp");
+    const levelUpRain = document.getElementById("levelUpRain");
+    const levelUpText = document.getElementById("levelUpText");
+
+    // The pieces of confetti that rain down when you reach a new level
+    const confettiPictures = ["🎉", "🎊", "⭐", "✨", "🌟"];
 
     // The rules for each level.
     // The question is "first number × second number".
@@ -305,13 +340,47 @@
           return;   // stop here: no more questions
         }
 
-        // Otherwise move up a level
+        // Otherwise move up a level, with a celebration
         level = level + 1;
-        feedbackBox.textContent = "Level " + level + "! 🚀";
+        showInfo();
+        showLevelUp();
+        return;   // the celebration brings the next question when it's done
       }
 
       showInfo();
       newQuestion();
+    }
+
+    // Confetti rain and a big "Level 2!" for about 3 seconds.
+    // The clock is paused, so the child doesn't lose any time.
+    function showLevelUp() {
+      playing = false;        // no answers while we celebrate
+      clearInterval(clock);   // pause the countdown
+      answerBox.blur();       // closes the phone keyboard
+      feedbackBox.textContent = "";
+
+      levelUpText.textContent = "Level " + level + "! 🚀";
+
+      // Make 30 pieces of confetti, each in a random place
+      levelUpRain.innerHTML = "";   // remove the confetti from last time
+      for (let i = 0; i < 30; i++) {
+        const piece = document.createElement("span");   // a new piece
+        piece.className = "falling";
+        piece.textContent = confettiPictures[randomNumber(confettiPictures.length) - 1];
+        piece.style.left = randomNumber(95) + "%";      // where across the screen
+        // Fall for 2 seconds, each starting at a slightly different moment
+        piece.style.animation = "fall 2s linear " + (Math.random() * 0.8) + "s both";
+        levelUpRain.appendChild(piece);                 // put it on the screen
+      }
+
+      levelUpScreen.className = "show";
+
+      // setTimeout runs this once, after 2800 ms (2.8 seconds)
+      setTimeout(function () {
+        levelUpScreen.className = "";   // hide the celebration
+        playing = true;
+        newQuestion();
+      }, 2800);
     }
 
     // What happens after a wrong answer (or when time runs out)
