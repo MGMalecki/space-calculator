@@ -289,7 +289,7 @@
     const levels = {
       1: { tables: [1, 2, 3, 4, 5, 10],             numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], time: 15 },
       2: { tables: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], time: 15 },
-      3: { tables: [6, 7, 8, 9],                    numbers: [3, 4, 6, 7, 8, 9],              time: 10 }  // the hardest ones
+      3: { tables: [6, 7, 8, 9],                    numbers: [2, 3, 4, 5, 6, 7, 8, 9, 10],    time: 10 }  // the hardest tables
     };
 
     // 5 right in a row = next level, 3 wrong in a row = game over
@@ -308,6 +308,7 @@
     let correctAnswer = 0;  // the right answer to the current question
     let timeLeft = 0;       // seconds left for this question
     let clock;              // the ticking clock, kept so we can stop it
+    let recentQuestions = [];  // the last few questions, so we don't repeat them
 
     // Updates the top of the screen: the level, and a row of stars or crosses
     function showInfo() {
@@ -347,9 +348,31 @@
       const tables = levels[level].tables;
       const numbers = levels[level].numbers;
 
-      // Pick one from each list, e.g. 4 and 7
-      const a = tables[randomNumber(tables.length) - 1];
-      const b = numbers[randomNumber(numbers.length) - 1];
+      let a, b, key;
+
+      // "do ... while" means: pick a question, and pick again
+      // while it is one of the last 5 questions
+      do {
+        // Pick one from each list, e.g. 4 and 7
+        a = tables[randomNumber(tables.length) - 1];
+        b = numbers[randomNumber(numbers.length) - 1];
+        // A name for the question, smaller number first,
+        // so "6 × 9" and "9 × 6" count as the same question: "6x9"
+        key = Math.min(a, b) + "x" + Math.max(a, b);
+      } while (recentQuestions.includes(key));
+
+      // Remember this question, and only keep the last 5
+      recentQuestions.push(key);
+      if (recentQuestions.length > 5) {
+        recentQuestions.shift();   // removes the oldest one
+      }
+
+      // Half of the time, swap the order: "9 × 6" instead of "6 × 9"
+      if (Math.random() < 0.5) {
+        const keep = a;
+        a = b;
+        b = keep;
+      }
 
       correctAnswer = a * b;
       questionBox.textContent = a + " × " + b + " = ?";
