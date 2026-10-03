@@ -7,7 +7,7 @@
   <!-- This line makes the page fit a phone screen instead of looking tiny -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <!-- The name shown on the browser tab -->
-  <title>Times Tables Game</title>
+  <title>Space Calculator</title>
 
   <!-- The STYLE section decides how things look: colours, sizes, spacing -->
   <style>
@@ -144,6 +144,33 @@
       animation: fall 3s linear infinite;
     }
 
+    /* ---------- The start screen ---------- */
+
+    /* Covers the whole game until Start is pressed */
+    #startScreen {
+      display: flex;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: #0b1d3a;   /* dark blue, like space at night */
+      color: white;
+    }
+
+    /* The game's name */
+    #gameName {
+      font-size: 40px;
+      font-weight: bold;
+    }
+
+    /* The big rocket, gently floating up and down */
+    #rocket {
+      font-size: 120px;
+      margin: 30px 0;
+      animation: bounce 2s infinite;
+    }
+
     /* ---------- The level-up celebration ---------- */
 
     /* Covers the game for a moment while confetti rains down */
@@ -202,6 +229,13 @@
   <!-- Empty for now. JavaScript writes "Correct!" or "Oops!" here. -->
   <div id="feedback"></div>
 
+  <!-- The start screen. It shows first, and covers the game until Start is pressed. -->
+  <div id="startScreen">
+    <div id="gameName">Space Calculator</div>
+    <div id="rocket">🚀</div>
+    <button id="start">Start</button>
+  </div>
+
   <!-- The level-up celebration. Hidden until you reach a new level. -->
   <div id="levelUp">
     <div id="levelUpRain"></div>   <!-- JavaScript fills this with confetti -->
@@ -239,6 +273,8 @@
     const endTitle = document.getElementById("endTitle");
     const confetti = document.getElementById("confetti");
     const playAgainButton = document.getElementById("playAgain");
+    const startScreen = document.getElementById("startScreen");
+    const startButton = document.getElementById("start");
     const levelUpScreen = document.getElementById("levelUp");
     const levelUpRain = document.getElementById("levelUpRain");
     const levelUpText = document.getElementById("levelUpText");
@@ -268,7 +304,7 @@
     let level = 1;          // which level we are on
     let rightInARow = 0;    // right answers in a row (shown as stars)
     let wrongInARow = 0;    // wrong answers in a row (shown as crosses)
-    let playing = true;     // becomes false when the game is won or lost
+    let playing = false;    // true only while a game is going on
     let correctAnswer = 0;  // the right answer to the current question
     let timeLeft = 0;       // seconds left for this question
     let clock;              // the ticking clock, kept so we can stop it
@@ -435,13 +471,14 @@
       confetti.style.display = "block";
     }
 
-    // Starts everything again from level 1
-    function playAgain() {
+    // Starts a new game from level 1 (used by both Start and Play again)
+    function startGame() {
       level = 1;
       rightInARow = 0;
       wrongInARow = 0;
       playing = true;
-      endScreen.className = "";   // hide the end screen
+      startScreen.style.display = "none";   // hide the start screen
+      endScreen.className = "";             // hide the end screen
       feedbackBox.textContent = "";
       showInfo();
       newQuestion();
@@ -467,8 +504,9 @@
     // When the button is clicked, check the answer
     checkButton.addEventListener("click", checkAnswer);
 
-    // When "Play again" is clicked, start a new game
-    playAgainButton.addEventListener("click", playAgain);
+    // "Start" and "Play again" both start a new game
+    startButton.addEventListener("click", startGame);
+    playAgainButton.addEventListener("click", startGame);
 
     // Pressing Enter on the keyboard also checks the answer
     answerBox.addEventListener("keydown", function (event) {
@@ -477,9 +515,7 @@
       }
     });
 
-    // Show the very first question when the page opens
-    showInfo();
-    newQuestion();
+    // Nothing else happens until the child presses Start
   </script>
 
 </body>
