@@ -27,6 +27,14 @@
       font-size: 20px;
     }
 
+    /* The small 🔊 / 🔇 sound button in the top row */
+    #sound {
+      margin: 0;
+      padding: 0 10px;
+      font-size: 22px;
+      background: none;   /* no orange box, just the emoji */
+    }
+
     /* The row of stars (right answers in a row) or crosses (wrong answers in a row) */
     #streak {
       font-size: 32px;
@@ -237,9 +245,10 @@
 <!-- The BODY is everything you actually see on the screen -->
 <body>
 
-  <!-- Top row: level and seconds left -->
+  <!-- Top row: level, sound on/off, seconds left -->
   <div class="info">
     <span id="level">Level 1</span>
+    <button id="sound">🔊</button>
     <span id="timer">⏱️ 15</span>
   </div>
 
@@ -320,6 +329,7 @@
     const levelUpScreen = document.getElementById("levelUp");
     const levelUpRain = document.getElementById("levelUpRain");
     const levelUpText = document.getElementById("levelUpText");
+    const soundButton = document.getElementById("sound");
 
     // The pieces of confetti that rain down when you reach a new level
     const confettiPictures = ["🎉", "🎊", "⭐", "✨", "🌟"];
@@ -352,6 +362,85 @@
     let clock;              // the ticking clock, kept so we can stop it
     let recentQuestions = [];  // the last few questions, so we don't repeat them
 
+    // ---------- Sounds ----------
+    // The sounds are made by the browser itself (the "Web Audio" feature),
+    // so there are no sound files to download.
+
+    let audio;            // the browser's sound maker, created when Start is tapped
+    let soundOn = true;   // false when the 🔇 button is on
+
+    // Remember the sound choice from last time. "localStorage" is a small
+    // memory the browser keeps for this page. try/catch means: if the
+    // browser doesn't allow it, just carry on without it.
+    try {
+      if (localStorage.getItem("sound") === "off") {
+        soundOn = false;
+      }
+    } catch (error) {}
+    // "a ? b : c" means: if a is true use b, otherwise use c
+    soundButton.textContent = soundOn ? "🔊" : "🔇";
+
+    // Plays one musical note.
+    // frequency: how high the note is (bigger number = higher note)
+    // duration:  how long it lasts, in seconds
+    // type:      the kind of sound: "sine" is soft, "square" is buzzy, "triangle" is in between
+    // delay:     how many seconds to wait before playing it
+    function playTone(frequency, duration, type, delay) {
+      if (!audio || !soundOn) {
+        return;
+      }
+      const start = audio.currentTime + (delay || 0);
+      const note = audio.createOscillator();   // makes the sound wave
+      const volume = audio.createGain();       // controls how loud it is
+      note.type = type;
+      note.frequency.value = frequency;
+      note.connect(volume);
+      volume.connect(audio.destination);       // "destination" = the speaker
+      // Start fairly quiet, then fade out smoothly so it doesn't click
+      volume.gain.setValueAtTime(0.2, start);
+      volume.gain.exponentialRampToValueAtTime(0.001, start + duration);
+      note.start(start);
+      note.stop(start + duration);
+    }
+
+    // The game's sound effects, built from notes
+    function soundTap()     { playTone(600, 0.05, "sine"); }
+    function soundTick()    { playTone(1000, 0.08, "square"); }
+    function soundCorrect() { playTone(523, 0.15, "sine"); playTone(784, 0.25, "sine", 0.1); }
+    function soundWrong()   { playTone(150, 0.35, "square"); }
+    function soundLevelUp() {
+      // four notes going up: da-da-da-daaa!
+      playTone(523, 0.15, "triangle");
+      playTone(659, 0.15, "triangle", 0.15);
+      playTone(784, 0.15, "triangle", 0.3);
+      playTone(1047, 0.5, "triangle", 0.45);
+    }
+    function soundGameOver() {
+      // a sad "wah wah wah waaah" going down
+      playTone(392, 0.4, "triangle");
+      playTone(370, 0.4, "triangle", 0.4);
+      playTone(349, 0.4, "triangle", 0.8);
+      playTone(330, 1.0, "triangle", 1.2);
+    }
+    function soundWin() {
+      // a little winning tune
+      playTone(523, 0.15, "triangle");
+      playTone(659, 0.15, "triangle", 0.15);
+      playTone(784, 0.15, "triangle", 0.3);
+      playTone(1047, 0.3, "triangle", 0.45);
+      playTone(784, 0.15, "triangle", 0.8);
+      playTone(1047, 0.8, "triangle", 0.95);
+    }
+
+    // The 🔊 button turns the sound on and off
+    soundButton.addEventListener("click", function () {
+      soundOn = !soundOn;   // "!" flips it: true becomes false, false becomes true
+      soundButton.textContent = soundOn ? "🔊" : "🔇";
+      try {
+        localStorage.setItem("sound", soundOn ? "on" : "off");
+      } catch (error) {}
+    });
+
     // Updates the top of the screen: the level, and a row of stars or crosses
     function showInfo() {
       levelBox.textContent = "Level " + level;
@@ -373,6 +462,11 @@
     function tick() {
       timeLeft = timeLeft - 1;
       timerBox.textContent = "⏱️ " + timeLeft;
+
+      // Tick-tock for the last 3 seconds
+      if (timeLeft > 0 && timeLeft <= 3) {
+        soundTick();
+      }
 
       // Time is up: this counts as a wrong answer
       if (timeLeft === 0) {
@@ -447,6 +541,7 @@
         return;   // the celebration brings the next question when it's done
       }
 
+      soundCorrect();
       showInfo();
       newQuestion();
     }
@@ -459,6 +554,7 @@
       feedbackBox.textContent = "";
 
       levelUpText.textContent = "Level " + level + "! 🚀";
+      soundLevelUp();
 
       // Make 30 pieces of confetti, each in a random place
       levelUpRain.innerHTML = "";   // remove the confetti from last time
@@ -494,6 +590,7 @@
         return;
       }
 
+      soundWrong();
       showInfo();
       newQuestion();
     }
@@ -516,6 +613,7 @@
       endArt.textContent = effectPictures[effect];
       endTitle.textContent = "GAME OVER";
       confetti.style.display = "none";
+      soundGameOver();
 
       // A short buzz. Only Android phones can do this, so we check first.
       if (navigator.vibrate) {
@@ -531,10 +629,17 @@
       endArt.textContent = "🏆";
       endTitle.textContent = "YOU WON!";
       confetti.style.display = "block";
+      soundWin();
     }
 
     // Starts a new game from level 1 (used by both Start and Play again)
     function startGame() {
+      // Phones only allow sound after a tap, so we switch it on here
+      if (!audio) {
+        audio = new AudioContext();
+      }
+      audio.resume();
+
       level = 1;
       rightInARow = 0;
       wrongInARow = 0;
@@ -553,6 +658,7 @@
       if (!playing || answerBox.value.length >= 3) {
         return;
       }
+      soundTap();
       answerBox.value = answerBox.value + digit;
     }
 
