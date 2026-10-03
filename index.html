@@ -50,7 +50,7 @@
       border-radius: 12px;   /* rounded corners */
     }
 
-    /* The orange Check button */
+    /* The orange buttons (Check and Play again) */
     button {
       display: block;
       margin: 30px auto;     /* "auto" puts it in the middle */
@@ -67,6 +67,92 @@
       font-size: 28px;
       min-height: 40px;      /* keeps space for it, so nothing jumps around */
     }
+
+    /* ---------- The end screen (game over or win) ---------- */
+
+    /* It covers the whole game. Hidden until the game ends. */
+    #endScreen {
+      display: none;
+      position: fixed;       /* stays put, on top of everything */
+      top: 0; left: 0; right: 0; bottom: 0;
+      overflow: hidden;      /* anything flying outside the screen is cut off */
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    #endScreen.show { display: flex; }          /* "show" makes it appear */
+    #endScreen.lose { background: #222; }       /* dark for game over */
+    #endScreen.win  { background: #fff3b0; }    /* sunny yellow for a win */
+
+    /* The big picture: 💀, 🌋, 💥 or 🏆 */
+    #endArt {
+      font-size: 150px;
+      position: relative;    /* so it sits above the lava */
+    }
+
+    /* The sign: "GAME OVER" or "YOU WON!" */
+    #endTitle {
+      position: relative;
+      font-size: 44px;
+      font-weight: bold;
+      background: white;
+      padding: 10px 25px;
+      border-radius: 12px;
+      margin-top: 20px;
+      /* pops in after 1 second, a little tilted like a real sign.
+         "both" keeps it hidden while it waits */
+      animation: pop 0.5s 1s both;
+    }
+    #endScreen.lose #endTitle { color: #d00; border: 5px solid #d00; }
+    #endScreen.win  #endTitle { color: #2a2;  border: 5px solid #2a2; }
+
+    /* Blue, so it stands out on the orange lava too */
+    #playAgain {
+      position: relative;
+      background: #1e88e5;
+    }
+
+    /* Effect 1: the skull grows, then spins */
+    #endScreen.skull #endArt {
+      animation: grow 0.8s, spin 1s 0.8s;
+    }
+
+    /* Effect 2: the lava rises from the bottom */
+    #lava {
+      display: none;
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      background: linear-gradient(#ff3d00, #ff9100, #ffd600);  /* red to yellow */
+      animation: rise 2s forwards;   /* "forwards" keeps it full when done */
+    }
+    #endScreen.lava #lava { display: block; }
+
+    /* Effect 3: the explosion bursts and the whole screen shakes */
+    #endScreen.explosion #endArt { animation: boom 0.7s; }
+    #endScreen.explosion { animation: shake 0.1s 6; }   /* shake 6 times */
+
+    /* Win: the trophy grows, then bounces forever */
+    #endScreen.win #endArt {
+      animation: grow 0.8s, bounce 1s 0.8s infinite;
+    }
+
+    /* Win: stars falling from the top */
+    .falling {
+      position: absolute;
+      top: -60px;
+      font-size: 40px;
+      animation: fall 3s linear infinite;
+    }
+
+    /* ---------- Animations: how things move over time ---------- */
+    @keyframes grow   { from { transform: scale(0); } to { transform: scale(1); } }
+    @keyframes pop    { from { transform: scale(0) rotate(-5deg); } to { transform: scale(1) rotate(-5deg); } }
+    @keyframes spin  { to { transform: rotate(360deg); } }
+    @keyframes rise   { from { height: 0; } to { height: 100%; } }
+    @keyframes boom   { 0% { transform: scale(0); } 60% { transform: scale(2.5); } 100% { transform: scale(1.3); } }
+    @keyframes shake  { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(15px); } }
+    @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-30px); } }
+    @keyframes fall   { to { transform: translateY(110vh); } }   /* vh = screen height */
   </style>
 </head>
 
@@ -76,7 +162,7 @@
   <!-- Top row: level and seconds left -->
   <div class="info">
     <span id="level">Level 1</span>
-    <span id="timer">⏱️ 10</span>
+    <span id="timer">⏱️ 15</span>
   </div>
 
   <!-- Stars or crosses in a row appear here -->
@@ -93,6 +179,22 @@
   <!-- Empty for now. JavaScript writes "Correct!" or "Oops!" here. -->
   <div id="feedback"></div>
 
+  <!-- The end screen. Hidden until the game is won or lost. -->
+  <div id="endScreen">
+    <div id="lava"></div>
+    <!-- Falling stars, only shown when you win. "left" is where across the screen each one falls. -->
+    <div id="confetti">
+      <span class="falling" style="left: 5%;  animation-delay: 0s;">⭐</span>
+      <span class="falling" style="left: 25%; animation-delay: 1s;">🎉</span>
+      <span class="falling" style="left: 45%; animation-delay: 0.5s;">🌟</span>
+      <span class="falling" style="left: 65%; animation-delay: 1.5s;">⭐</span>
+      <span class="falling" style="left: 85%; animation-delay: 0.8s;">🎉</span>
+    </div>
+    <div id="endArt"></div>
+    <div id="endTitle"></div>
+    <button id="playAgain">Play again</button>
+  </div>
+
   <!-- The SCRIPT is the brain of the game: JavaScript that makes things happen -->
   <script>
     // Find the parts of the page we want to control, using their ids
@@ -103,22 +205,29 @@
     const timerBox = document.getElementById("timer");
     const levelBox = document.getElementById("level");
     const streakBox = document.getElementById("streak");
+    const endScreen = document.getElementById("endScreen");
+    const endArt = document.getElementById("endArt");
+    const endTitle = document.getElementById("endTitle");
+    const confetti = document.getElementById("confetti");
+    const playAgainButton = document.getElementById("playAgain");
 
     // The rules for each level.
     // The question is "first number × second number".
     // "tables" lists the first numbers, "numbers" lists the second numbers.
+    // "time" is how many seconds each question gets.
     const levels = {
-      1: { tables: [1, 2, 3, 4, 5, 10],             numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] },
-      2: { tables: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] },
-      3: { tables: [6, 7, 8, 9],                    numbers: [3, 4, 6, 7, 8, 9] }  // the hardest ones
+      1: { tables: [1, 2, 3, 4, 5, 10],             numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], time: 15 },
+      2: { tables: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], time: 15 },
+      3: { tables: [6, 7, 8, 9],                    numbers: [3, 4, 6, 7, 8, 9],              time: 10 }  // the hardest ones
     };
-
-    // Every question gets 10 seconds, on every level
-    const timeLimit = 10;
 
     // 5 right in a row = next level, 3 wrong in a row = game over
     const rightNeeded = 5;
     const wrongAllowed = 3;
+
+    // The three fun game-over effects, and the big picture for each
+    const effects = ["skull", "lava", "explosion"];
+    const effectPictures = { skull: "💀", lava: "🌋", explosion: "💥" };
 
     // The game's "memory": these numbers change while you play
     let level = 1;          // which level we are on
@@ -136,10 +245,10 @@
       streakBox.textContent = "⭐".repeat(rightInARow) + "❌".repeat(wrongInARow);
     }
 
-    // Starts the countdown again from 10
+    // Starts the countdown again from the full time for this level
     function startTimer() {
       clearInterval(clock);   // stop the old clock first, so we never have two
-      timeLeft = timeLimit;
+      timeLeft = levels[level].time;
       timerBox.textContent = "⏱️ " + timeLeft;
 
       // setInterval runs the tick function again and again, every 1000 ms (1 second)
@@ -192,7 +301,7 @@
 
         if (level === 3) {
           // 5 in a row on the last level means the game is won
-          endGame("You won! 🏆", "green");
+          showWinScreen();
           return;   // stop here: no more questions
         }
 
@@ -213,7 +322,7 @@
       feedbackBox.style.color = "red";
 
       if (wrongInARow === wrongAllowed) {
-        endGame("Game over 💀", "red");
+        showGameOverScreen();
         return;
       }
 
@@ -221,13 +330,52 @@
       newQuestion();
     }
 
-    // Stops the game and shows a message. (Step 5 will make this a proper screen.)
-    function endGame(message, colour) {
+    // Stops the game: no more ticking, no more answers
+    function stopGame() {
       playing = false;
       clearInterval(clock);
+      answerBox.blur();   // closes the phone keyboard
       showInfo();
-      feedbackBox.textContent = message;
-      feedbackBox.style.color = colour;
+    }
+
+    // Game over: pick one of the three effects at random
+    function showGameOverScreen() {
+      stopGame();
+
+      const effect = effects[randomNumber(effects.length) - 1];
+
+      // The class names switch on the right CSS, e.g. "show lose lava"
+      endScreen.className = "show lose " + effect;
+      endArt.textContent = effectPictures[effect];
+      endTitle.textContent = "GAME OVER";
+      confetti.style.display = "none";
+
+      // A short buzz. Only Android phones can do this, so we check first.
+      if (navigator.vibrate) {
+        navigator.vibrate(300);
+      }
+    }
+
+    // The game is won!
+    function showWinScreen() {
+      stopGame();
+
+      endScreen.className = "show win";
+      endArt.textContent = "🏆";
+      endTitle.textContent = "YOU WON!";
+      confetti.style.display = "block";
+    }
+
+    // Starts everything again from level 1
+    function playAgain() {
+      level = 1;
+      rightInARow = 0;
+      wrongInARow = 0;
+      playing = true;
+      endScreen.className = "";   // hide the end screen
+      feedbackBox.textContent = "";
+      showInfo();
+      newQuestion();
     }
 
     // Runs when the child presses Check
@@ -249,6 +397,9 @@
 
     // When the button is clicked, check the answer
     checkButton.addEventListener("click", checkAnswer);
+
+    // When "Play again" is clicked, start a new game
+    playAgainButton.addEventListener("click", playAgain);
 
     // Pressing Enter on the keyboard also checks the answer
     answerBox.addEventListener("keydown", function (event) {
