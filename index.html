@@ -15,9 +15,21 @@
     body {
       font-family: Arial, sans-serif;
       text-align: center;
-      background: #fff8e7;   /* soft cream colour */
-      color: #333;           /* dark grey text */
+      color: white;
       padding: 20px;
+    }
+
+    /* Space: dark blue with little stars. Used for the game, the start screen and the rocket trip.
+       Each "radial-gradient" draws tiny white dots in a repeating pattern;
+       three patterns of different sizes on top of each other look like scattered stars. */
+    body, #startScreen, #trip {
+      background-color: #0b1d3a;
+      background-image:
+        radial-gradient(circle, white 1px, transparent 1.5px),
+        radial-gradient(circle, rgba(255, 255, 255, 0.6) 1px, transparent 1.5px),
+        radial-gradient(circle, rgba(255, 255, 255, 0.8) 1.5px, transparent 2px);
+      background-size: 97px 89px, 61px 53px, 173px 151px;
+      background-position: 0 0, 30px 20px, 80px 110px;
     }
 
     /* The top row: level and time, spread across the screen */
@@ -140,7 +152,8 @@
       animation: pop 0.5s 1s both;
     }
     #endScreen.lose #endTitle { color: #d00; border: 5px solid #d00; }
-    #endScreen.win  #endTitle { color: #2a2;  border: 5px solid #2a2; }
+    #endScreen.win  #endTitle { color: #2a2;  border: 5px solid #2a2; font-size: 30px; margin: 20px 30px 0; }
+    #endScreen.win  #endArt   { font-size: 110px; }   /* smaller, so 🌍🏆 fit side by side */
 
     /* Blue, so it stands out on the orange lava too */
     #playAgain {
@@ -190,7 +203,6 @@
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      background: #0b1d3a;   /* dark blue, like space at night */
       color: white;
     }
 
@@ -215,7 +227,7 @@
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
       overflow: hidden;
-      background: rgba(255, 255, 255, 0.8);   /* see-through white */
+      background: rgba(11, 29, 58, 0.85);   /* see-through dark blue */
       justify-content: center;
       align-items: center;
     }
@@ -230,7 +242,53 @@
       animation: grow 0.6s, bounce 0.8s 0.6s infinite;
     }
 
+    /* ---------- The rocket trip between planets ---------- */
+
+    /* Covers the whole game while the rocket flies (the starry background is set at the top) */
+    #trip {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      overflow: hidden;
+    }
+    #trip.show { display: block; }
+
+    /* "Flying to Mars..." and then "Welcome to Mars!" */
+    #tripText {
+      position: absolute;
+      top: 40%;
+      width: 100%;
+      font-size: 30px;
+      font-weight: bold;
+      color: #f0a500;
+    }
+
+    /* The planet we leave: bottom left */
+    #tripFrom {
+      position: absolute;
+      left: 5%;
+      bottom: 5%;
+      font-size: 90px;
+    }
+
+    /* The planet we fly to: top right. It grows as we get closer. */
+    #tripTo {
+      position: absolute;
+      right: 5%;
+      top: 8%;
+      font-size: 90px;
+      animation: grow 2s;
+    }
+
+    /* The rocket flies from bottom left to top right in 2 seconds */
+    #tripRocket {
+      position: absolute;
+      font-size: 60px;
+      animation: fly 2s ease-in-out forwards;   /* "forwards" = stay where it lands */
+    }
+
     /* ---------- Animations: how things move over time ---------- */
+    @keyframes fly    { from { left: 25%; bottom: 15%; } to { left: 62%; bottom: 66%; } }
     @keyframes grow   { from { transform: scale(0); } to { transform: scale(1); } }
     @keyframes pop    { from { transform: scale(0) rotate(-5deg); } to { transform: scale(1) rotate(-5deg); } }
     @keyframes spin  { to { transform: rotate(360deg); } }
@@ -294,6 +352,14 @@
     <div id="levelUpText"></div>
   </div>
 
+  <!-- The rocket trip from one planet to the next. Hidden until it's time to fly. -->
+  <div id="trip">
+    <div id="tripText"></div>
+    <div id="tripFrom"></div>
+    <div id="tripTo"></div>
+    <div id="tripRocket">🚀</div>
+  </div>
+
   <!-- The end screen. Hidden until the game is won or lost. -->
   <div id="endScreen">
     <div id="lava"></div>
@@ -330,6 +396,18 @@
     const levelUpRain = document.getElementById("levelUpRain");
     const levelUpText = document.getElementById("levelUpText");
     const soundButton = document.getElementById("sound");
+    const tripScreen = document.getElementById("trip");
+    const tripText = document.getElementById("tripText");
+    const tripFrom = document.getElementById("tripFrom");
+    const tripTo = document.getElementById("tripTo");
+
+    // The story: each level is a planet. We start on Earth and fly home to Earth at the end.
+    const planets = {
+      1: { name: "the Moon", short: "Moon",   picture: "🌕" },
+      2: { name: "Mars",     short: "Mars",   picture: "🔴" },
+      3: { name: "Saturn",   short: "Saturn", picture: "🪐" }
+    };
+    const earth = { name: "Earth", short: "Earth", picture: "🌍" };
 
     // The pieces of confetti that rain down when you reach a new level
     const confettiPictures = ["🎉", "🎊", "⭐", "✨", "🌟"];
@@ -422,6 +500,12 @@
       playTone(349, 0.4, "triangle", 0.8);
       playTone(330, 1.0, "triangle", 1.2);
     }
+    function soundTakeOff() {
+      // notes going quickly higher and higher: whoooosh!
+      for (let i = 0; i < 8; i++) {
+        playTone(200 + i * 80, 0.15, "sine", i * 0.08);
+      }
+    }
     function soundWin() {
       // a little winning tune
       playTone(523, 0.15, "triangle");
@@ -443,7 +527,8 @@
 
     // Updates the top of the screen: the level, and a row of stars or crosses
     function showInfo() {
-      levelBox.textContent = "Level " + level;
+      // Show the planet we are on, e.g. "🌕 Moon"
+      levelBox.textContent = planets[level].picture + " " + planets[level].short;
       // .repeat(3) writes the emoji 3 times, e.g. "⭐⭐⭐"
       streakBox.textContent = "⭐".repeat(rightInARow) + "❌".repeat(wrongInARow);
     }
@@ -523,14 +608,16 @@
       rightInARow = rightInARow + 1;
       wrongInARow = 0;   // a right answer clears the crosses
       feedbackBox.textContent = "Correct! 🎉";
-      feedbackBox.style.color = "green";
+      feedbackBox.style.color = "#5f5";   /* bright green, easy to read on dark blue */
 
       if (rightInARow === rightNeeded) {
         rightInARow = 0;   // start the stars again on the new level
 
         if (level === 3) {
-          // 5 in a row on the last level means the game is won
-          showWinScreen();
+          // 5 in a row on the last level means the game is won:
+          // fly home to Earth, then show the win screen
+          stopGame();
+          rocketTrip(planets[3], earth, showWinScreen);
           return;   // stop here: no more questions
         }
 
@@ -546,7 +633,7 @@
       newQuestion();
     }
 
-    // Confetti rain and a big "Level 2!" for about 3 seconds.
+    // Confetti rain and a big "Level 2!", then the rocket trip to the next planet.
     // The clock is paused, so the child doesn't lose any time.
     function showLevelUp() {
       playing = false;        // no answers while we celebrate
@@ -563,19 +650,51 @@
         piece.className = "falling";
         piece.textContent = confettiPictures[randomNumber(confettiPictures.length) - 1];
         piece.style.left = randomNumber(95) + "%";      // where across the screen
-        // Fall for 2 seconds, each starting at a slightly different moment
-        piece.style.animation = "fall 2s linear " + (Math.random() * 0.8) + "s both";
+        // Fall for 1.8 seconds, each starting at a slightly different moment
+        piece.style.animation = "fall 1.8s linear " + (Math.random() * 0.5) + "s both";
         levelUpRain.appendChild(piece);                 // put it on the screen
       }
 
       levelUpScreen.className = "show";
 
-      // setTimeout runs this once, after 2800 ms (2.8 seconds)
+      // setTimeout runs this once, after 2300 ms (2.3 seconds)
       setTimeout(function () {
-        levelUpScreen.className = "";   // hide the celebration
-        playing = true;
-        newQuestion();
-      }, 2800);
+        levelUpScreen.className = "";   // hide the confetti
+        // Fly from the old planet to the new one, then carry on playing
+        rocketTrip(planets[level - 1], planets[level], beginPlanet);
+      }, 2300);
+    }
+
+    // The rocket flies from one planet to another (about 3 seconds).
+    // "whenDone" is a function we run after landing, e.g. beginPlanet.
+    function rocketTrip(fromPlanet, toPlanet, whenDone) {
+      playing = false;        // no answers while flying
+      clearInterval(clock);   // pause the countdown
+
+      tripFrom.textContent = fromPlanet.picture;
+      tripTo.textContent = toPlanet.picture;
+      tripText.textContent = "Flying to " + toPlanet.name + "...";
+      tripScreen.className = "show";   // showing it starts the animations from the beginning
+      soundTakeOff();
+
+      // After 2 seconds the rocket has landed
+      setTimeout(function () {
+        tripText.textContent = "Welcome to " + toPlanet.name + "!";
+        soundCorrect();
+      }, 2000);
+
+      // After 3.2 seconds hide the trip and carry on
+      setTimeout(function () {
+        tripScreen.className = "";
+        whenDone();
+      }, 3200);
+    }
+
+    // We have landed on a planet: start asking questions
+    function beginPlanet() {
+      playing = true;
+      showInfo();
+      newQuestion();
     }
 
     // What happens after a wrong answer (or when time runs out)
@@ -583,7 +702,7 @@
       wrongInARow = wrongInARow + 1;
       rightInARow = 0;   // a wrong answer clears the stars
       feedbackBox.textContent = message;
-      feedbackBox.style.color = "red";
+      feedbackBox.style.color = "#ff6b6b";   /* bright red, easy to read on dark blue */
 
       if (wrongInARow === wrongAllowed) {
         showGameOverScreen();
@@ -626,8 +745,8 @@
       stopGame();
 
       endScreen.className = "show win";
-      endArt.textContent = "🏆";
-      endTitle.textContent = "YOU WON!";
+      endArt.textContent = "🌍🏆";
+      endTitle.textContent = "YOU MADE IT HOME!";
       confetti.style.display = "block";
       soundWin();
     }
@@ -643,12 +762,14 @@
       level = 1;
       rightInARow = 0;
       wrongInARow = 0;
-      playing = true;
+      recentQuestions = [];
       startScreen.style.display = "none";   // hide the start screen
       endScreen.className = "";             // hide the end screen
       feedbackBox.textContent = "";
       showInfo();
-      newQuestion();
+
+      // Take off from Earth and land on the Moon, then the questions begin
+      rocketTrip(earth, planets[1], beginPlanet);
     }
 
     // Runs when a number on the pad is tapped: adds that digit to the answer
