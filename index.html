@@ -154,7 +154,43 @@
     }
     #endScreen.lose #endTitle { color: #d00; border: 5px solid #d00; }
     #endScreen.win  #endTitle { color: #2a2;  border: 5px solid #2a2; font-size: 30px; margin: 20px 30px 0; }
-    #endScreen.win  #endArt   { font-size: 110px; }   /* smaller, so 🌍🏆 fit side by side */
+    #endScreen.win  #endArt   { font-size: 80px; }   /* smaller, so 🌍🏆 and the records fit */
+
+    /* "Your time: 3:42" on the win screen */
+    #yourTime {
+      position: relative;
+      font-size: 24px;
+      font-weight: bold;
+      color: #333;
+      margin-top: 15px;
+    }
+
+    /* ---------- The records table (top 8) ---------- */
+    .records {
+      position: relative;
+      margin: 10px auto;
+      border-collapse: collapse;   /* no gaps between the cells */
+      font-size: 20px;
+    }
+    .records td { padding: 3px 10px; }
+    .records td:nth-child(2) { text-align: left; }   /* names lined up on the left */
+    .records .new { background: #f0a500; color: white; font-weight: bold; }   /* the new record */
+    #endScreen .records { color: #333; }
+    #endScreen.win #playAgain { margin-top: 10px; }
+    #endScreen.lose #yourTime, #endScreen.lose #winTable { display: none; }   /* only when you win */
+
+    /* The records screen you open from the start screen */
+    #recordsScreen {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #0b1d3a;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    #recordsScreen.show { display: flex; }
+    #recordsTitle { font-size: 32px; font-weight: bold; margin-bottom: 10px; }
 
     /* Blue, so it stands out on the orange lava too */
     #playAgain {
@@ -214,9 +250,30 @@
     }
 
     /* The big rocket, gently floating up and down */
+    /* The box for the player's nickname */
+    #nickname {
+      font-size: 24px;
+      width: 220px;
+      padding: 8px;
+      text-align: center;
+      border: 3px solid #f0a500;
+      border-radius: 12px;
+    }
+
+    /* Start sits just under the name box */
+    #start { margin: 20px auto 15px; }
+
+    /* The blue "🏆 Records" button */
+    #recordsButton, #closeRecords {
+      margin: 0 auto;
+      font-size: 22px;
+      padding: 10px 30px;
+      background: #1e88e5;
+    }
+
     #rocket {
-      font-size: 120px;
-      margin: 30px 0;
+      font-size: 90px;
+      margin: 15px 0;
       animation: bounce 2s infinite;
     }
 
@@ -364,7 +421,17 @@
   <div id="startScreen">
     <div id="gameName">Space Calculator</div>
     <div id="rocket">🚀</div>
+    <!-- maxlength="12" means the name can be at most 12 letters long -->
+    <input id="nickname" type="text" maxlength="12" placeholder="Your name">
     <button id="start">Start</button>
+    <button id="recordsButton">🏆 Records</button>
+  </div>
+
+  <!-- The records screen: the 8 best journey times on this phone -->
+  <div id="recordsScreen">
+    <div id="recordsTitle">🏆 Best journeys</div>
+    <table id="recordsTable" class="records"></table>
+    <button id="closeRecords">Back</button>
   </div>
 
   <!-- The level-up celebration. Hidden until you reach a new level. -->
@@ -394,6 +461,9 @@
     </div>
     <div id="endArt"></div>
     <div id="endTitle"></div>
+    <!-- Only shown when you win: your time and the top 8 -->
+    <div id="yourTime"></div>
+    <table id="winTable" class="records"></table>
     <button id="playAgain">Play again</button>
   </div>
 
@@ -413,6 +483,13 @@
     const playAgainButton = document.getElementById("playAgain");
     const startScreen = document.getElementById("startScreen");
     const startButton = document.getElementById("start");
+    const nicknameBox = document.getElementById("nickname");
+    const recordsButton = document.getElementById("recordsButton");
+    const recordsScreen = document.getElementById("recordsScreen");
+    const recordsTable = document.getElementById("recordsTable");
+    const closeRecordsButton = document.getElementById("closeRecords");
+    const yourTimeBox = document.getElementById("yourTime");
+    const winTable = document.getElementById("winTable");
     const levelUpScreen = document.getElementById("levelUp");
     const levelUpRain = document.getElementById("levelUpRain");
     const levelUpText = document.getElementById("levelUpText");
@@ -461,6 +538,9 @@
     let timeLeft = 0;       // seconds left for this question
     let clock;              // the ticking clock, kept so we can stop it
     let recentQuestions = [];  // the last few questions, so we don't repeat them
+    let playerName = "";       // the nickname typed on the start screen
+    let journeyTime = 0;       // thinking time so far on this journey, in milliseconds
+    let questionStartTime = 0; // when the current question appeared
 
     // ---------- Sounds ----------
     // The sounds are made by the browser itself (the "Web Audio" feature),
@@ -624,6 +704,7 @@
 
       correctAnswer = a * b;
       questionBox.textContent = a + " × " + b + " = ?";
+      questionStartTime = Date.now();   // remember when this question appeared
 
       answerBox.value = "";   // clear the old answer
 
@@ -632,6 +713,7 @@
 
     // What happens after a right answer
     function rightAnswer() {
+      addThinkingTime();
       rightInARow = rightInARow + 1;
       wrongInARow = 0;   // a right answer clears the crosses
       feedbackBox.textContent = "Correct! 🎉";
@@ -760,6 +842,7 @@
 
     // What happens after a wrong answer (or when time runs out)
     function wrongAnswer(message) {
+      addThinkingTime();
       wrongInARow = wrongInARow + 1;
       rightInARow = 0;   // a wrong answer clears the stars
       feedbackBox.textContent = message;
@@ -810,10 +893,119 @@
       endTitle.textContent = "YOU MADE IT HOME!";
       confetti.style.display = "block";
       soundWin();
+
+      // Save the time and show the top 8, with the new time highlighted
+      const result = saveRecord(playerName, journeyTime);
+      yourTimeBox.textContent = playerName + ", your time: " + formatTime(journeyTime);
+      if (result.place === -1) {
+        yourTimeBox.textContent += " (not in the top 8 yet, try again!)";
+      }
+      fillRecordsTable(winTable, result.records, result.place);
     }
+
+    // ---------- Journey time and records ----------
+
+    // Adds the time spent on the question that was just answered.
+    // Date.now() is the time right now, in milliseconds (1000 ms = 1 second).
+    // Only question time counts: confetti and rocket trips are not added.
+    function addThinkingTime() {
+      journeyTime = journeyTime + (Date.now() - questionStartTime);
+    }
+
+    // Turns milliseconds into minutes and seconds, e.g. 222000 → "3:42"
+    function formatTime(milliseconds) {
+      const totalSeconds = Math.round(milliseconds / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;   // "%" gives what is left over after dividing
+      // Always two digits for seconds: "3:05", not "3:5"
+      return minutes + ":" + (seconds < 10 ? "0" + seconds : seconds);
+    }
+
+    // Reads the saved records from this phone's browser memory (localStorage).
+    // They are saved as text in "JSON" form; JSON.parse turns that text back into a list.
+    function loadRecords() {
+      try {
+        const saved = localStorage.getItem("records");
+        if (saved) {
+          return JSON.parse(saved);
+        }
+      } catch (error) {}
+      return [];   // nothing saved yet
+    }
+
+    // Adds a new time, keeps only the 8 best, and saves them.
+    // Gives back the list and where the new time landed (-1 = not in the top 8).
+    function saveRecord(name, time) {
+      const records = loadRecords();
+      const newRecord = { name: name, time: time };
+      records.push(newRecord);
+
+      // Sort from fastest to slowest (smaller time first)
+      records.sort(function (a, b) {
+        return a.time - b.time;
+      });
+
+      const best = records.slice(0, 8);   // keep only the first 8
+      try {
+        localStorage.setItem("records", JSON.stringify(best));
+      } catch (error) {}
+
+      return { records: best, place: best.indexOf(newRecord) };
+    }
+
+    // Fills a table with the records. The row number "highlight" gets a colour.
+    function fillRecordsTable(table, records, highlight) {
+      table.innerHTML = "";   // empty the table first
+
+      if (records.length === 0) {
+        const row = table.insertRow();
+        row.insertCell().textContent = "No journeys yet. Be the first! 🚀";
+        return;
+      }
+
+      for (let i = 0; i < records.length; i++) {
+        const row = table.insertRow();   // a new row
+        row.insertCell().textContent = (i + 1) + ".";
+        row.insertCell().textContent = records[i].name;
+        row.insertCell().textContent = formatTime(records[i].time);
+        if (i === highlight) {
+          row.className = "new";
+        }
+      }
+    }
+
+    // The "🏆 Records" button on the start screen
+    recordsButton.addEventListener("click", function () {
+      fillRecordsTable(recordsTable, loadRecords(), -1);
+      recordsScreen.className = "show";
+    });
+
+    // "Back" closes the records screen
+    closeRecordsButton.addEventListener("click", function () {
+      recordsScreen.className = "";
+    });
+
+    // Put the last nickname used on this phone back in the name box
+    try {
+      nicknameBox.value = localStorage.getItem("nickname") || "";
+    } catch (error) {}
 
     // Starts a new game from level 1 (used by both Start and Play again)
     function startGame() {
+      // A name is needed for the records. .trim() removes spaces at the start and end.
+      const name = nicknameBox.value.trim();
+      if (name === "") {
+        nicknameBox.placeholder = "Type your name first!";
+        nicknameBox.focus();
+        return;   // don't start yet
+      }
+      playerName = name;
+      try {
+        localStorage.setItem("nickname", name);   // remember it for next time
+      } catch (error) {}
+
+      journeyTime = 0;   // a new journey starts at 0:00
+
       // Phones only allow sound after a tap, so we switch it on here
       if (!audio) {
         audio = new AudioContext();
@@ -883,7 +1075,11 @@
       } else if (event.key === "Enter") {
         // Stop Enter from also "pressing" whichever button was tapped last
         event.preventDefault();
-        checkAnswer();
+        if (startScreen.style.display !== "none") {
+          startGame();   // on the start screen, Enter means Start
+        } else {
+          checkAnswer();
+        }
       }
     });
 
