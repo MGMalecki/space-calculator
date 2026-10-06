@@ -333,16 +333,16 @@
     #tripTo {
       position: absolute;
       right: 5%;
-      top: 8%;
+      top: 18%;   /* low enough to leave room for the rocket to land on top */
       font-size: 90px;
-      animation: grow 2s;
+      animation: grow 2.4s;
     }
 
-    /* The rocket flies from bottom left to top right in 2 seconds */
+    /* The rocket flies from the old planet to the new one in 2.4 seconds */
     #tripRocket {
       position: absolute;
       font-size: 60px;
-      animation: fly 2s ease-in-out forwards;   /* "forwards" = stay where it lands */
+      animation: fly 2.4s forwards;   /* "forwards" = stay where it lands */
     }
 
     /* ---------- The peeking alien ---------- */
@@ -363,7 +363,16 @@
     @keyframes peekLeft  { 25%, 75% { transform: translateX(-65px) rotate(-20deg); } }
 
     /* ---------- Animations: how things move over time ---------- */
-    @keyframes fly    { from { left: 25%; bottom: 15%; } to { left: 62%; bottom: 66%; } }
+    /* The rocket's flight path. "calc" mixes a share of the screen (%) with exact pixels (px),
+       so the rocket sits right on the planets on any phone size.
+       The 🚀 emoji points to the top right; rotate(-45deg) turns it to stand upright. */
+    @keyframes fly {
+      0%   { left: calc(5% + 21px);   top: calc(95% - 179px); transform: rotate(-45deg); }  /* standing on the old planet */
+      15%  { left: calc(5% + 21px);   top: calc(95% - 250px); transform: rotate(-45deg); }  /* lift off straight up */
+      50%  { left: 35%;               top: 35%;               transform: rotate(0deg); }    /* fly across the stars */
+      80%  { left: calc(95% - 103px); top: calc(18% - 110px); transform: rotate(-30deg); }  /* arrive above the new planet */
+      100% { left: calc(95% - 103px); top: calc(18% - 60px);  transform: rotate(-45deg); }  /* slowly land, upright */
+    }
     @keyframes grow   { from { transform: scale(0); } to { transform: scale(1); } }
     @keyframes pop    { from { transform: scale(0) rotate(-5deg); } to { transform: scale(1) rotate(-5deg); } }
     @keyframes spin  { to { transform: rotate(360deg); } }
@@ -786,17 +795,17 @@
       tripScreen.className = "show";   // showing it starts the animations from the beginning
       soundTakeOff();
 
-      // After 2 seconds the rocket has landed
+      // After 2.4 seconds the rocket has landed
       setTimeout(function () {
         tripText.textContent = "Welcome to " + toPlanet.name + "!";
         soundCorrect();
-      }, 2000);
+      }, 2400);
 
-      // After 3.2 seconds hide the trip and carry on
+      // After 3.6 seconds hide the trip and carry on
       setTimeout(function () {
         tripScreen.className = "";
         whenDone();
-      }, 3200);
+      }, 3600);
     }
 
     // We have landed on a planet: start asking questions
