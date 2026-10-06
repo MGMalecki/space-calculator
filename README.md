@@ -25,4 +25,6 @@ Try to beat the 🏆 **Records**: the 8 fastest journeys are saved on your devic
 
 ## About
 
-Made with plain HTML, CSS and JavaScript, all in one file (`index.html`). Free to share. See [LICENSE](LICENSE).
+Made with plain HTML, CSS and JavaScript, all in one file (`index.html`), with no frameworks. Hosted for free on GitHub Pages.
+
+Free to share under the MIT licence. See [LICENSE](LICENSE).
