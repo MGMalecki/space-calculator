@@ -17,6 +17,7 @@
       text-align: center;
       color: white;
       padding: 20px;
+      transition: background-color 1s;   /* fades smoothly to each planet's colour */
     }
 
     /* Space: dark blue with little stars. Used for the game, the start screen and the rocket trip.
@@ -287,6 +288,23 @@
       animation: fly 2s ease-in-out forwards;   /* "forwards" = stay where it lands */
     }
 
+    /* ---------- The peeking alien ---------- */
+
+    /* Hidden just outside the screen. A class says which edge it peeks from. */
+    #alien {
+      display: none;
+      position: fixed;
+      font-size: 56px;
+    }
+    #alien.bottom { display: block; bottom: -70px; animation: peekUp 1.6s; }
+    #alien.left   { display: block; left: -70px;  top: 50px; animation: peekRight 1.6s; }
+    #alien.right  { display: block; right: -70px; top: 50px; animation: peekLeft 1.6s; }
+
+    /* Slide in, stay for a moment, slide back out */
+    @keyframes peekUp    { 25%, 75% { transform: translateY(-65px); } }
+    @keyframes peekRight { 25%, 75% { transform: translateX(65px) rotate(20deg); } }
+    @keyframes peekLeft  { 25%, 75% { transform: translateX(-65px) rotate(-20deg); } }
+
     /* ---------- Animations: how things move over time ---------- */
     @keyframes fly    { from { left: 25%; bottom: 15%; } to { left: 62%; bottom: 66%; } }
     @keyframes grow   { from { transform: scale(0); } to { transform: scale(1); } }
@@ -338,6 +356,9 @@
     <button class="key" onclick="pressDigit('0')">0</button>
     <button class="key check" onclick="checkAnswer()">✓</button>
   </div>
+
+  <!-- The alien who peeks in every now and then -->
+  <div id="alien">👽</div>
 
   <!-- The start screen. It shows first, and covers the game until Start is pressed. -->
   <div id="startScreen">
@@ -402,10 +423,11 @@
     const tripTo = document.getElementById("tripTo");
 
     // The story: each level is a planet. We start on Earth and fly home to Earth at the end.
+    // "colour" is the background colour while we are on that planet.
     const planets = {
-      1: { name: "the Moon", short: "Moon",   picture: "🌕" },
-      2: { name: "Mars",     short: "Mars",   picture: "🔴" },
-      3: { name: "Saturn",   short: "Saturn", picture: "🪐" }
+      1: { name: "the Moon", short: "Moon",   picture: "🌕", colour: "#3b4a63" },   // grey-blue
+      2: { name: "Mars",     short: "Mars",   picture: "🔴", colour: "#5c2a1c" },   // rusty red-brown
+      3: { name: "Saturn",   short: "Saturn", picture: "🪐", colour: "#5a4318" }    // golden-brown
     };
     const earth = { name: "Earth", short: "Earth", picture: "🌍" };
 
@@ -499,6 +521,11 @@
       playTone(370, 0.4, "triangle", 0.4);
       playTone(349, 0.4, "triangle", 0.8);
       playTone(330, 1.0, "triangle", 1.2);
+    }
+    function soundBoop() {
+      // a funny "boo-oop" for the alien
+      playTone(500, 0.12, "sine");
+      playTone(300, 0.2, "sine", 0.12);
     }
     function soundTakeOff() {
       // notes going quickly higher and higher: whoooosh!
@@ -693,9 +720,43 @@
     // We have landed on a planet: start asking questions
     function beginPlanet() {
       playing = true;
+      document.body.style.backgroundColor = planets[level].colour;   // the planet's colour
       showInfo();
       newQuestion();
     }
+
+    // ---------- The peeking alien ----------
+    const alien = document.getElementById("alien");
+    const alienEdges = ["bottom", "left", "right"];
+
+    // The alien peeks in for a moment, then we plan its next visit
+    function alienPeek() {
+      // Only while the child is answering questions (not during trips or end screens)
+      if (playing) {
+        const edge = alienEdges[randomNumber(alienEdges.length) - 1];
+        if (edge === "bottom") {
+          alien.style.left = (10 + Math.random() * 70) + "%";   // somewhere along the bottom
+        } else {
+          alien.style.left = "";   // the left/right classes place it at the side
+        }
+        alien.className = edge;   // e.g. "bottom" starts the peekUp animation
+        soundBoop();
+
+        // Hide it again when the 1.6-second animation is over
+        setTimeout(function () {
+          alien.className = "";
+        }, 1600);
+      }
+      planAlienVisit();
+    }
+
+    // Waits a random 20 to 40 seconds, then lets the alien peek
+    function planAlienVisit() {
+      const seconds = 20 + Math.random() * 20;
+      setTimeout(alienPeek, seconds * 1000);
+    }
+
+    planAlienVisit();   // plan the very first visit when the page opens
 
     // What happens after a wrong answer (or when time runs out)
     function wrongAnswer(message) {
